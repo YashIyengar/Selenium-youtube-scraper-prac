@@ -7,6 +7,8 @@ import pandas as pd
 import smtplib
 import os
 import json
+import gspread
+from oauth2client.service_account import ServiceAccountCredentials
 
 YOUTUBE_TRENDNG_URL = 'https://www.youtube.com/feed/trending'
 
@@ -51,6 +53,24 @@ def parse_video(video):
     }
 
 
+def dict_to_googlesheets(api_key, spread_sheet, data):
+    # define the scope
+    scope = ['https://spreadsheets.google.com/feeds', 'https://www.googleapis.com/auth/drive']
+
+    # add credentials to the account
+    creds = ServiceAccountCredentials.from_json_keyfile_name(api_key, scope)
+
+    client = gspread.authorize(creds)
+
+    # get the instance of the Spreadsheet
+    sheet = client.open(spread_sheet).sheet1
+
+    data_df = pd.DataFrame(data)
+
+    final_sheet = sheet.insert_rows(data_df.values.tolist())
+
+    return final_sheet
+
 def send_email(body):
     try:
         server_ssl = smtplib.SMTP_SSL('smtp.gmail.com', 465)
@@ -91,14 +111,19 @@ if __name__ == "__main__":
     print('Parsing the top 10 videos ')
     videos_data = [parse_video(video) for video in videos[:10]]
 
-    print("Save the data to CSV")
+    print('Saving the data to Google Spreadsheets')
+    dict_to_googlesheets('scrapping-practice-11696e2cdf5c.json', 'Youtube Trending Data', videos_data)
+
+    #print("Save the data to CSV")
     # videos_df = pd.DataFrame(videos_data)
     # print(videos_df)
     # videos_df.to_csv("trending.csv", index=None)
 
     print("Send the results over email")
 
-    body = json.dumps(videos_data, indent=2)
+    body = {
+        "link to data": "https://docs.google.com/spreadsheets/d/16psRhOF8onOjVPHi8-AALGUnrhppGjH9USDl5hrHdFs/edit#gid=0"}
+
     send_email(body)
 
     print('Finished.')
